@@ -1,24 +1,16 @@
 {
-  "mcpServers": {
-    "zulipchat": {
-      "command": "uvx",
-      "args": ["zulipchat-mcp@0.6.2"],
-      "env": {
-        "ZULIP_EMAIL": "${ZULIP_EMAIL}",
-        "ZULIP_API_KEY": "${ZULIP_API_KEY}",
-        "ZULIP_SITE": "${ZULIP_SITE}"
-      }
-    }
-  },
-  "bearerKeys": [
-    {
-      "id": "00000000-0000-0000-0000-000000000001",
-      "name": "default",
-      "token": "${MCPHUB_BEARER_KEY}",
+  "mcpServers": {},
+  "systemConfig": {
+    "install": {
+      "baseUrl": "${BASE_URL}"
+    },
+    "oauthServer": {
       "enabled": true,
-      "accessType": "all",
-      "allowedGroups": [],
-      "allowedServers": []
+      "allowedScopes": ["read", "write"],
+      "dynamicRegistration": {
+        "enabled": true
+      },
+      "requireClientSecret": false
     }
-  ]
+  }
 }

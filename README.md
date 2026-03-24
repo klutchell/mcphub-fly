@@ -2,26 +2,52 @@
 
 Deploys [MCPHub](https://github.com/samanhappy/mcphub) to Fly.io,
 exposing stdio MCP servers as Streamable HTTP endpoints
-with bearer token auth.
+with OAuth 2.0 auth.
 
-## First-time setup
+## Setup
 
 ```bash
-# Create Fly app (no deploy yet)
-fly launch --yes --no-deploy --internal-port 3000 \
-  --ha=false --vm-memory 1024 --name your-app-name
+fly launch --ha=false --vm-memory 1024
 
-# Set secrets
-fly secrets set \
-  JWT_SECRET="$(openssl rand -hex 32)" \
-  MCPHUB_BEARER_KEY="your-bearer-token" \
-  ZULIP_EMAIL="bot@example.zulipchat.com" \
-  ZULIP_API_KEY="your-zulip-api-key" \
-  ZULIP_SITE="https://example.zulipchat.com"
+fly secrets set JWT_SECRET="$(openssl rand -hex 32)"
 
-# Initial deploy
 fly deploy
 ```
+
+A random admin password is generated on first boot.
+Retrieve it from the deploy logs:
+
+```bash
+fly logs
+```
+
+Log in at `https://<app>.fly.dev` with username `admin`
+and the logged password. Change it from the admin panel.
+
+## Adding MCP servers
+
+Add servers from the dashboard, then connect clients to:
+
+```text
+https://<app>.fly.dev/mcp/<server>
+```
+
+### OAuth clients (Claude.ai, Notion, etc.)
+
+Clients that support MCP OAuth will automatically discover
+auth via `/.well-known/oauth-authorization-server`, run an
+OAuth PKCE flow, and prompt you to log in.
+
+### Claude Code
+
+```bash
+claude mcp add <server> https://<app>.fly.dev/mcp/<server> --transport http
+```
+
+### Claude Desktop
+
+Add a new connector in the UI with the URL
+`https://<app>.fly.dev/mcp/<server>`.
 
 ## Redeploy
 
@@ -29,48 +55,23 @@ fly deploy
 fly deploy
 ```
 
-## Usage
-
-MCP endpoint: `https://<app>.fly.dev/mcp/zulipchat`
-
-Connect from any MCP client that supports Streamable HTTP:
-
-```json
-{
-  "mcpServers": {
-    "zulipchat": {
-      "type": "streamable-http",
-      "url": "https://<app>.fly.dev/mcp/zulipchat",
-      "headers": {
-        "Authorization": "Bearer your-bearer-token"
-      }
-    }
-  }
-}
-```
-
 ## Verify
 
 ```bash
 fly status
 fly logs
-curl -H "Authorization: Bearer $MCPHUB_BEARER_KEY" https://<app>.fly.dev/mcp/zulipchat
 ```
 
 ## Architecture
 
-MCPHub uses `${VAR}` substitution in MCP server `env`/`args`
-fields at runtime, but not in `bearerKeys`. The entrypoint wrapper
-uses `envsubst` to expand only `MCPHUB_BEARER_KEY` into the config
-at startup, leaving `ZULIP_*` placeholders for MCPHub's runtime
-expansion.
+MCPHub acts as both an OAuth authorization server and MCP
+proxy. Clients discover auth endpoints via RFC 8414 metadata,
+register dynamically (RFC 7591), and complete an OAuth PKCE
+flow. All runtime state (users, OAuth clients, tokens, MCP
+server configs) persists in a Fly volume at `/app/data`.
 
 ## Secrets
 
 | Secret | Purpose |
 | ------ | ------- |
 | `JWT_SECRET` | MCPHub JWT signing |
-| `MCPHUB_BEARER_KEY` | Bearer token for client auth (expanded by entrypoint) |
-| `ZULIP_EMAIL` | Zulip bot email (expanded by MCPHub runtime) |
-| `ZULIP_API_KEY` | Zulip API key (expanded by MCPHub runtime) |
-| `ZULIP_SITE` | Zulip instance URL (expanded by MCPHub runtime) |
